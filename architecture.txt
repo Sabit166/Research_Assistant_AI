@@ -1,0 +1,82 @@
+                                    START
+                                      ↓
+                            ┌─────────────────┐
+                            │  session_init   │ ← Initialize session ID, clear short-term memory
+                            └─────────────────┘
+                                      ↓
+                            ┌─────────────────┐
+                            │  check_input    │ ← Determine: PDF upload or query?
+                            └─────────────────┘
+                                      ↓
+                    ┌─────────────────┴─────────────────┐
+                    ↓                                   ↓
+          ┌─────────────────┐                ┌─────────────────┐
+          │  ingest_pdf     │                │  process_query  │
+          │                 │                │                 │
+          │ - Extract text  │                │ - Parse query   │
+          │ - Chunk text    │                │ - Check intent  │
+          │ - Generate      │                └─────────────────┘
+          │   embeddings    │                         ↓
+          │ - Store in      │               ┌─────────────────┐
+          │   session index │               │ retrieve_memory │
+          │ - Store in      │               │                 │
+          │   vector DB     │               │ Short-term:     │
+          └─────────────────┘               │ - Session msgs  │
+                    ↓                       │ - Session docs  │
+          ┌─────────────────┐               │                 │
+          │ confirm_ingest  │               │ Long-term:      │
+          │                 │               │ - Vector DB     │
+          │ "PDF loaded"    │               │ - Past sessions │
+          └─────────────────┘               └─────────────────┘
+                    ↓                                 ↓
+                    └─────────────────┬───────────────┘
+                                    ↓
+                            ┌─────────────────┐
+                            │  merge_context  │ ← Combine short-term + long-term results
+                            │                 │
+                            │ - Deduplicate   │
+                            │ - Rank by       │
+                            │   relevance     │
+                            │ - Limit tokens  │
+                            └─────────────────┘
+                                    ↓
+                            ┌─────────────────┐
+                            │ generate_answer │ ← LLM generates response
+                            │                 │
+                            │ - Build prompt  │
+                            │ - Call LLM      │
+                            │ - Extract       │
+                            │   answer + src  │
+                            └─────────────────┘
+                                    ↓
+                            ┌─────────────────┐
+                            │ update_session  │ ← Update short-term memory
+                            │                 │
+                            │ - Add query     │
+                            │ - Add answer    │
+                            │ - Update hist   │
+                            └─────────────────┘
+                                    ↓
+                            ┌─────────────────┐
+                            │ should_persist? │ ← Conditional: Save to long-term?
+                            └─────────────────┘
+                                    ↓
+                    ┌─────────────────┴─────────────────┐
+                    ↓                                   ↓
+          ┌─────────────────┐                ┌─────────────────┐
+          │ persist_to_     │                │ finalize_       │
+          │ longterm        │                │ response        │
+          │                 │                │                 │
+          │ - Summarize     │                │ - Format output │
+          │   session       │                │ - Add sources   │
+          │ - Store summary │                │ - Return answer │
+          │   in vector DB  │                └─────────────────┘
+          │ - Add metadata  │                         ↓
+          └─────────────────┘                       END
+                    ↓
+          ┌─────────────────┐
+          │ finalize_       │
+          │ response        │
+          └─────────────────┘
+                    ↓
+                   END

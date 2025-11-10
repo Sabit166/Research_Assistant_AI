@@ -14,7 +14,7 @@ from datetime import datetime
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.graph import create_research_graph
+from src.graph import create_graph
 from src.configuration import ResearchAgentConfig
 from src.state import ResearchState
 
@@ -37,7 +37,7 @@ class ResearchAssistantCLI:
         """Initialize CLI."""
         self.setup_directories()
         self.config = ResearchAgentConfig()
-        self.graph = create_research_graph(self.config)
+        self.graph = create_graph()
         self.session_id = self._generate_session_id()
         self.interaction_count = 0
         self.uploaded_pdfs = []
@@ -60,7 +60,7 @@ class ResearchAssistantCLI:
         print("🤖 Research Assistant AI - CLI Interface")
         print("=" * 70)
         print(f"Session ID: {self.session_id}")
-        print(f"Model: {self.config.model_name}")
+        print(f"Model: {self.config.local_llm}")
         print(f"Embeddings: {self.config.embedding_model}")
         print("=" * 70)
         print("\nCommands:")
@@ -137,19 +137,35 @@ class ResearchAssistantCLI:
         try:
             # Create initial state
             initial_state: ResearchState = {
-                "messages": [],
-                "session_id": self.session_id,
-                "current_query": "",
-                "pdf_content": "",
-                "pdf_file_path": str(path.absolute()),
-                "relevant_chunks": [],
-                "session_memory": {},
-                "longterm_memory": [],
-                "interaction_count": self.interaction_count,
+                # Input fields
+                "user_query": "",
+                "uploaded_pdfs": [str(path.absolute())],  # ✅ Fixed: Pass PDF path as list
+
+                # Session management
+                "session_id": self.session_id,  # ✅ Fixed: Use actual session ID
+                "session_messages": [],
+                "session_docs": [],
+
+                # Processing state
+                "input_type": "pdf_upload",  # ✅ Fixed: This is PDF upload
+                "parsed_query": "",
+
+                # Retrieval results
+                "retrieved_short_term": [],
+                "retrieved_long_term": [],
+                "merged_context": [],
+
+                # Output fields
+                "answer": "",
+                "sources": [],
+
+                # Control flow
                 "should_persist": False,
-                "current_step": "ingest_pdf",
-                "error": None,
-                "next_action": "ingest_pdf"
+
+                # Metadata
+                "pdf_chunks_count": 0,
+                "retrieval_scores": {},
+                "timestamp": datetime.utcnow().isoformat(),
             }
             
             # Run graph
@@ -189,7 +205,7 @@ class ResearchAssistantCLI:
         print(f"   Session ID: {self.session_id}")
         print(f"   Interactions: {self.interaction_count}")
         print(f"   PDFs Uploaded: {len(self.uploaded_pdfs)}")
-        print(f"   Model: {self.config.model_name}")
+        print(f"   Model: {self.config.local_llm}")
         print(f"   Temperature: {self.config.temperature}")
         print(f"   Persist Threshold: {self.config.persist_threshold}")
     
@@ -238,21 +254,38 @@ class ResearchAssistantCLI:
             
             # Create state
             initial_state: ResearchState = {
-                "messages": [],
-                "session_id": self.session_id,
-                "current_query": query,
-                "pdf_content": "",
-                "pdf_file_path": "",
-                "relevant_chunks": [],
-                "session_memory": {},
-                "longterm_memory": [],
-                "interaction_count": self.interaction_count,
+                # Input fields
+                "user_query": query,  # ✅ Fixed: Pass actual query
+                "uploaded_pdfs": [],  # ✅ Fixed: Empty list (no new PDFs)
+
+                # Session management
+                "session_id": self.session_id,  # ✅ Fixed: Use actual session ID
+                "session_messages": [],
+                "session_docs": [],
+
+                # Processing state
+                "input_type": "query",  # ✅ Correct: This is a query
+                "parsed_query": "",
+
+                # Retrieval results
+                "retrieved_short_term": [],
+                "retrieved_long_term": [],
+                "merged_context": [],
+
+                # Output fields
+                "answer": "",
+                "sources": [],
+
+                # Control flow
                 "should_persist": False,
-                "current_step": "process_query",
-                "error": None,
-                "next_action": "process_query"
+
+                # Metadata
+                "pdf_chunks_count": 0,
+                "retrieval_scores": {},
+                "timestamp": datetime.utcnow().isoformat(),
             }
             
+                        
             # Run graph
             result = self.graph.invoke(initial_state)
             
@@ -262,28 +295,22 @@ class ResearchAssistantCLI:
                 logger.error(f"Graph error: {result['error']}")
                 return
             
-            # Extract answer from messages
-            messages = result.get("messages", [])
-            if messages:
-                last_message = messages[-1]
-                if hasattr(last_message, 'content'):
-                    answer = last_message.content
-                else:
-                    answer = str(last_message)
-                
+            # Get answer
+            answer = result.get("answer", "")
+            if answer:
                 print(f"\n💡 Answer:")
                 print("-" * 70)
                 print(answer)
                 print("-" * 70)
             
-            # Show relevant sources
-            relevant_chunks = result.get("relevant_chunks", [])
-            if relevant_chunks:
-                print(f"\n📚 Sources ({len(relevant_chunks)}):")
-                for i, chunk in enumerate(relevant_chunks[:3], 1):  # Show top 3
-                    score = chunk.get('score', 0.0)
-                    content = chunk.get('content', '')[:100] + "..."
-                    metadata = chunk.get('metadata', {})
+            # Show sources
+            sources = result.get("sources", [])
+            if sources:
+                print(f"\n📚 Sources ({len(sources)}):")
+                for i, source in enumerate(sources[:5], 1):  # Show top 5
+                    score = source.get("score", 0.0)
+                    text = source.get("text", "")[:100]
+                    metadata = source.get("metadata", {})
                     
                     # Color code by relevance
                     if score >= 0.9:
@@ -294,11 +321,19 @@ class ResearchAssistantCLI:
                         indicator = "🔴"
                     
                     print(f"   {i}. {indicator} Relevance: {score:.3f}")
-                    if metadata.get('source'):
-                        print(f"      Source: {Path(metadata['source']).name}")
-                    if metadata.get('page'):
-                        print(f"      Page: {metadata['page']}")
-                    print(f"      Preview: {content}")
+                    
+                    # Source info
+                    source_name = metadata.get("source", "Unknown")
+                    if source_name:
+                        print(f"      Source: {Path(source_name).name}")
+                    
+                    # Memory type
+                    memory_type = source.get("memory_type", metadata.get("memory_type", "unknown"))
+                    print(f"      Memory: {memory_type}")
+                    
+                    # Preview
+                    if text:
+                        print(f"      Preview: {text}...")
             
             # Show persistence status
             if result.get("should_persist"):

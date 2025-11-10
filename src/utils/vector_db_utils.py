@@ -166,7 +166,7 @@ class ChromaDBClient(VectorDB):
             
             # Format results
             documents = []
-            if results["documents"] and len(results["documents"]) > 0:
+            if results["documents"] and results["distances"] and len(results["documents"]) > 0:
                 for i in range(len(results["documents"][0])):
                     doc = {
                         "text": results["documents"][0][i],

@@ -45,6 +45,15 @@ def session_init(state: ResearchState, config: RunnableConfig) -> Dict:
     Returns:
         Updated state dict
     """
+    
+    user_query = state.get("user_query")
+    uploaded_pdfs = state.get("uploaded_pdfs")
+    
+    if user_query is None:
+        raise ValueError("user_query is a required input field.")
+    if uploaded_pdfs is None:
+        raise ValueError("uploaded_pdfs is a required input field.")
+    
     logger.info("NODE: session_init - Initializing session")
     
     # Generate unique session ID
@@ -153,22 +162,23 @@ def ingest_pdf(state: ResearchState, config: RunnableConfig) -> Dict:
     
     try:
         # Process each PDF
-        for pdf_path in uploaded_pdfs:
-            logger.info(f"Processing PDF: {pdf_path}")
-            
-            # Extract and chunk
-            full_text, chunks = process_pdf(
-                pdf_path,
-                chunk_size=cfg.pdf_chunk_size,
-                chunk_overlap=cfg.pdf_chunk_overlap
-            )
-            
-            # Add session metadata
-            for chunk in chunks:
-                chunk["session_id"] = session_id
-                chunk["timestamp"] = datetime.now().isoformat()
-            
-            all_chunks.extend(chunks)
+        if uploaded_pdfs:
+            for pdf_path in uploaded_pdfs:
+                logger.info(f"Processing PDF: {pdf_path}")
+                
+                # Extract and chunk
+                full_text, chunks = process_pdf(
+                    pdf_path,
+                    chunk_size=cfg.pdf_chunk_size,
+                    chunk_overlap=cfg.pdf_chunk_overlap
+                )
+                
+                # Add session metadata
+                for chunk in chunks:
+                    chunk["session_id"] = session_id
+                    chunk["timestamp"] = datetime.now().isoformat()
+                
+                all_chunks.extend(chunks)
         
         # Generate embeddings for all chunks
         chunks_with_embeddings = add_embeddings_to_chunks(all_chunks, embedding_gen)
@@ -212,11 +222,11 @@ def confirm_ingest(state: ResearchState, config: RunnableConfig) -> Dict:
     """
     logger.info("NODE: confirm_ingest - Confirming PDF ingestion")
     
-    pdf_count = len(state.get("uploaded_pdfs", []))
+    #pdf_count = len(state.get("uploaded_pdfs", []))
     chunks_count = state.get("pdf_chunks_count", 0)
     
     confirmation_message = (
-        f"✅ Successfully processed {pdf_count} PDF file(s).\n"
+        #f"✅ Successfully processed {pdf_count} PDF file(s).\n"
         f"📄 Created {chunks_count} text chunks.\n"
         f"💾 Stored in both session memory and long-term database.\n"
         f"🔍 You can now ask questions about the content!"
@@ -283,7 +293,7 @@ Provide a brief analysis (2-3 sentences) focusing on what information would best
             messages = [HumanMessage(content=intent_prompt)]
             response = llm.invoke(messages)
             
-            query_analysis = response.content.strip()
+            query_analysis = str(response.content).strip()
             logger.info(f"Query analysis: {query_analysis[:150]}...")
             
             return {
@@ -808,7 +818,7 @@ Write the summary in third person, focusing on what was researched and discovere
         messages = [HumanMessage(content=summary_prompt)]
         response = llm.invoke(messages)
         
-        summary = response.content.strip()
+        summary = str(response.content).strip()
         logger.info(f"Generated intelligent session summary ({len(summary)} chars)")
         
         # Generate embedding for summary
@@ -884,7 +894,7 @@ def create_graph():
     logger.info("Constructing Research Assistant graph...")
     
     # Create graph
-    graph = StateGraph(ResearchState, input=ResearchStateInput, output=ResearchStateOutput)
+    graph = StateGraph(ResearchState)
     
     # Add all nodes
     graph.add_node("session_init", session_init)

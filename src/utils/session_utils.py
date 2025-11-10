@@ -108,48 +108,48 @@ class SessionManager:
             logger.error(f"Error listing sessions: {str(e)}")
             return []
     
-    def create_session_summary(
-        self,
-        session_id: str,
-        messages: List[Dict],
-        documents: List[Dict]
-    ) -> str:
-        """Create a text summary of a session for long-term storage.
+    # def create_session_summary(
+    #     self,
+    #     session_id: str,
+    #     messages: List[Dict],
+    #     documents: List[Dict]
+    # ) -> str:
+    #     """Create a text summary of a session for long-term storage.
         
-        Args:
-            session_id: Session identifier
-            messages: List of conversation messages
-            documents: List of session documents
+    #     Args:
+    #         session_id: Session identifier
+    #         messages: List of conversation messages
+    #         documents: List of session documents
             
-        Returns:
-            Text summary of the session
-        """
-        try:
-            summary_parts = [
-                f"Session ID: {session_id}",
-                f"Timestamp: {datetime.now().isoformat()}",
-                f"Number of messages: {len(messages)}",
-                f"Number of documents: {len(documents)}",
-                "\n--- Conversation Summary ---"
-            ]
+    #     Returns:
+    #         Text summary of the session
+    #     """
+    #     try:
+    #         summary_parts = [
+    #             f"Session ID: {session_id}",
+    #             f"Timestamp: {datetime.now().isoformat()}",
+    #             f"Number of messages: {len(messages)}",
+    #             f"Number of documents: {len(documents)}",
+    #             "\n--- Conversation Summary ---"
+    #         ]
             
-            # Summarize conversation
-            for i, msg in enumerate(messages):
-                role = msg.get("type", "unknown")
-                content = msg.get("content", "")
-                summary_parts.append(f"[{i+1}] {role}: {content[:200]}...")
+    #         # Summarize conversation
+    #         for i, msg in enumerate(messages):
+    #             role = msg.get("type", "unknown")
+    #             content = msg.get("content", "")
+    #             summary_parts.append(f"[{i+1}] {role}: {content[:200]}...")
             
-            # Summarize documents
-            if documents:
-                summary_parts.append("\n--- Document Summary ---")
-                doc_sources = set(doc.get("source", "unknown") for doc in documents)
-                summary_parts.append(f"Sources: {', '.join(doc_sources)}")
-                summary_parts.append(f"Total chunks: {len(documents)}")
+    #         # Summarize documents
+    #         if documents:
+    #             summary_parts.append("\n--- Document Summary ---")
+    #             doc_sources = set(doc.get("source", "unknown") for doc in documents)
+    #             summary_parts.append(f"Sources: {', '.join(doc_sources)}")
+    #             summary_parts.append(f"Total chunks: {len(documents)}")
             
-            summary = "\n".join(summary_parts)
-            logger.info(f"Created summary for session {session_id}")
-            return summary
+    #         summary = "\n".join(summary_parts)
+    #         logger.info(f"Created summary for session {session_id}")
+    #         return summary
             
-        except Exception as e:
-            logger.error(f"Error creating session summary: {str(e)}")
-            raise
+    #     except Exception as e:
+    #         logger.error(f"Error creating session summary: {str(e)}")
+    #         raise

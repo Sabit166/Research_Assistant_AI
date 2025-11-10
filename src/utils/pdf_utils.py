@@ -1,6 +1,6 @@
 """Utility functions for PDF processing."""
 import logging
-from typing import List, Dict
+from typing import List, Dict, Any
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
